@@ -1,0 +1,7 @@
+/.env
+/userdata
+node_modules/
+/data/record.json
+/commands/test.js
+/error
+.vscode/
