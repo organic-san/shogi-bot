@@ -13,9 +13,9 @@ module.exports = {
         opt.setName('offensive')
             .setDescription('選擇要先手的玩家。')
             .addChoices(
-                { name: '發起遊戲的玩家', value: 1 },
-                { name: '收到邀請的玩家', value: 2 },
-                { name: '隨機決定', value: 3 },
+                { name: '發起遊戲的玩家', value: 0 },
+                { name: '收到邀請的玩家', value: 1 },
+                { name: '隨機決定', value: 2 },
             )
             .setRequired(true)
     ),
@@ -27,19 +27,30 @@ module.exports = {
      */
 	async execute(interaction) {
 		const user = [interaction.user, interaction.options.getUser('player')]
-        const offensive = interaction.options.getNumber('offensive');
+        let offensive = interaction.options.getNumber('offensive');
         //const kinjite = interaction.options.getBoolean('kinjite');
         if(user[1].bot) return interaction.reply("無法向機器人發送遊玩邀請。");
         //TODO: AI五子棋玩家
         if(user[1].id === user[0].id) return interaction.reply("無法向自己發送遊玩邀請。");
 
+        const inputRule = "下棋輸入說明：\n" + 
+        "移動棋子時，請根據(旗子原本的位置)(旗子移動後的位置)(是否升變，未輸入則不升變)的方式輸入。\n" +
+        "例如將棋子將從 `7七` 移動到 `7六`，請輸入 `7七7六`。\n" +
+        "需要升變的時候請在位置後加入 `+` 符號，例如將棋子從 `7四` 移動到 `7三` 並升變，請輸入 `7四7三+`。\n\n" +
+        "打入手上持有的旗子時，請輸入要打入的棋子名稱與打入的位置。\n" +
+        "打入的棋子名稱請輸入 `步`、`香`、`桂`、`銀`、`金`、`角`、`飛` 的其中一種，" +
+        "或是輸入 `步兵`、`香車`、`桂馬`、`銀將`、`金將`、`角行`、`飛車` 的其中一種。\n" +
+        "例如在 `3四` 打入一枚 `步`，請輸入 `步3四` 或 `步兵3四`。在 `7五` 打入一枚 `桂馬`，請輸入 `桂7五` 或 `桂馬7五`，這兩種都是合法輸入。\n"
+        
         const help = 
             "將棋 - 遊戲說明: \n" + 
             "主要以捕獲對方玉將為原則。\n" + 
             "詳細說明請參照維基百科：<https://zh.wikipedia.org/wiki/%E6%97%A5%E6%9C%AC%E5%B0%86%E6%A3%8B>\n" +
-            "為簡化規則，目前無法做出入玉宣言。" +
-            (offensive === 1 ? `${user[0]} (${user[0].tag}) 為先手。` : 
-                (offensive === 2 ? `${user[1]} (${user[1].tag}) 為先手。` : "先後手將隨機決定。"));
+            "為簡化規則，無法做出入玉宣言。\n\n" +
+            inputRule + "(以上輸入方法在遊玩過程中也可以查看。)\n\n" +
+            "每一步棋的時間限制是3分鐘，請在輪到自己後的3分鐘內完成操作。\n\n" +
+            (offensive === 0 ? `${user[0]} (${user[0].tag}) 為先手。` : 
+                (offensive === 1 ? `${user[1]} (${user[1].tag}) 為先手。` : "先後手將隨機決定。"));
             
         const OKbutton = new Discord.ActionRowBuilder().addComponents(
             new Discord.ButtonBuilder()
@@ -99,80 +110,104 @@ module.exports = {
         let p2btn = await message[1].awaitMessageComponent({ filter: msgfilter, componentType: Discord.ComponentType.Button, time: 5 * 60 * 1000 });
         if (!p2btn) {
             mainMsg.edit("對方並未對邀請做出回覆，因此取消開始遊戲。");
-            message[0].edit("對方並未對邀請做出回覆，因此取消開始遊玩五子棋。");
-            return p2btn.update(`剛剛 ${user[0]} (${user[0].tag}) 向你發送了五子棋(/gomoku)的遊玩邀請，但你並未回覆。`);
+            message[0].edit("對方並未對邀請做出回覆，因此取消開始遊玩將棋。");
+            return p2btn.update(`剛剛 ${user[0]} (${user[0].tag}) 向你發送了將棋(/shogi)的遊玩邀請，但你並未回覆。`);
         }
 
         await mainMsg.edit("對方同意遊玩邀請了! 即將開始遊戲...").catch(() => {});
 
-        let player = offensive <= 2 ? offensive : Math.floor(Math.random() * 2) + 1;
+        offensive = offensive <= 1 ? offensive : Math.floor(Math.random() * 2);
+        /**
+         * @type {number} 先手的玩家
+         */
+        const sente = offensive;
+        /**
+         * @type {number} 後手的玩家
+         */
+        const gote = (offensive + 1) % 2;
+        /**
+         * @type {number} 當下的玩家
+         */
+        let player = offensive;
         let step = 0;
-        let board = new Shogi();
+        const board = new Shogi();
+        const simbol = ["☗", "☖"];
         board.init();
         let gameInfo = 
             `遊戲: 將棋\n` + 
-            `先手☗: ${player === 1 ? user[0] : user[1]} (${player === 1 ? user[0].tag : user[1].tag})\n` + 
-            `後手☖: ${player === 2 ? user[0] : user[1]} (${player === 2 ? user[0].tag : user[1].tag})\n`;
+            `先手${simbol[sente]}: ${user[sente]} (${user[sente].tag})\n` + 
+            `後手${simbol[gote]}: ${user[gote]} (${user[gote].tag})\n`;
         let nowPlayer = 
-            `目前操作玩家: ${player === 1 ? user[0] : user[1]} (${player === 1 ? user[0].tag : user[1].tag})\n`;
-        const msgPlaying = "請輸入要下棋的位置。";
+            `目前操作玩家: ${user[sente]} (${user[sente].tag})\n`;
+        const msgPlaying = "請輸入要下棋的位置。\n\n" + inputRule;
         //TODO: 在這裡說明下棋的方式
         const msgWaiting = "正在等待對方執行操作...";
         const timelimit = 3;
         let masu = "";
 
-        /**
-         * @type {Discord.Message<boolean>}
-         */
-        let nowBoard = await board.board();
-        message.forEach((msg, ind) => {
+        message.forEach(async (msg, ind) => {
             msg.edit({
-                content: 
-                    `${gameInfo}\n\n${nowPlayer}${player === (ind + 1) ? msgPlaying : msgPlaying}`,
-                files: [nowBoard],
+                content:
+                    `${gameInfo}\n${nowPlayer}${ind == offensive ? msgPlaying : msgWaiting}`,
+                files: [await board.board(ind == offensive)],
                 components: []
             })
         })
+
+        //TODO: 放棄按鈕與它的偵測，按下放棄按鈕視同按下方認輸
 
         let collector = [
             message[0].channel.createMessageCollector({time: (player === 1 ? timelimit : 999) * 60 * 1000 }),
             message[1].channel.createMessageCollector({time: (player === 2 ? timelimit : 999) * 60 * 1000 })
         ]
-        mainMsg.edit("正在遊玩遊戲中...");
-
+        mainMsg.edit("正在開始遊玩中...");
+        
         collector.forEach(async (col, index) => {
             col.on("collect", async msg => {
                 if(msg.author.id !== user[index].id) return;
                 collector[index].resetTimer(timelimit * 60 * 1000);
-                if(player !== (index + 1)) 
+                if(player !== (index))
                     return msg.reply({content: '還沒有輪到你喔', allowedMentions: {repliedUser: false}});
+                
+                //判斷現在的玩家是否為先手
+                const playerIsSente = (index === offensive);
 
+                //輸入資料的格式檢查
+                if(!Shogi.inputCheck(msg.content)) return msg.reply({content: '位置資訊不符合格式，機器人無法解讀，請依照格式輸入。', allowedMentions: {repliedUser: false}});
+                //輸入資料的統一化調整 & 消彌先後手盤面方向不同造成的輸入差異
+                const input = Shogi.inputTranslate(msg.content, playerIsSente)
+
+
+                //TODO: 對執行結果做遊戲結束的檢定
+                //TODO: 更新遊玩過程資料並傳送給玩家與主訊息，主訊息的圖片以先手方顯示的版本為主
             });
         });
 
         collector.forEach(async (col, index) => {
             col.on('end',async (c, r) => {
                 if(r !== "messageDelete" && r !== "end"){
-                    nowBoard = await board.board();
+                    //TODO: 修改勝負判定讓超時的一方為敗者，另一方為勝者
+                    const senteBoard = await board.board(0);
+                    const goteBoard = await board.board(1);
                     message[index].edit({
                         content: 
                             `${gameInfo}\n\n` + 
                             `由於你太久沒有回應，因此結束了這場遊戲。`,
-                        files: [nowBoard],
+                        files: [index == sente ? senteBoard : goteBoard],
                         components: []
                     });
                     message[(index + 1) % 2].edit({
                         content: 
                             `${gameInfo}\n\n` + 
                             `由於對方太久沒有回應，因此結束了這場遊戲。`,
-                            files: [nowBoard],
+                            files: [(index + 1) % 2 == sente ? senteBoard : goteBoard],
                         components: []
                     });
                     mainMsg.edit({
                         content: 
                             `${gameInfo}\n` + 
                             "遊戲因為操作逾時而結束。",
-                        files: [nowBoard],
+                        files: [senteBoard],
                     }).catch(() => {});
                     collector[(index + 1) % 2].stop('end');
                 }
@@ -193,15 +228,15 @@ module.exports = {
 
 class Shogi {
     /**
-     * @type {{game: Array<Array<string>>,sente: Array<string>,gote: Array<string>}}
+     * @type {{game: Array<Array<string>>,senteKoma: Array<string>,goteKoma: Array<string>}}
      */
     #board;
     //手番については、先手番ならb、後手番ならwと表記します。（Black、Whiteの頭文字）
     constructor() {
         this.#board = {
             game: [],
-            sente: [],
-            gote: []
+            senteKoma: [],
+            goteKoma: []
         }
         for(let i = 0; i < 9; i++) {
             this.#board.game.push(['0', '0', '0', '0', '0', '0', '0', '0', '0', ]);
@@ -220,8 +255,8 @@ class Shogi {
             ['0', 'B', '0', '0', '0', '0', '0', 'R', '0'],
             ['L', 'N', 'S', 'G', 'K', 'G', 'S', 'N', 'L'],
         ]
-        this.#board.sente = [];
-        this.#board.gote = [];
+        this.#board.senteKoma = [];
+        this.#board.goteKoma = [];
         /*
         先手の玉：K、後手の玉：k （Kingの頭文字）
         先手の飛車：R、後手の飛車：r （Rookの頭文字）
@@ -244,6 +279,7 @@ class Shogi {
         const canvas = Canvas.createCanvas(2304, 2304);
 		const context = canvas.getContext('2d');
 
+        //座標指定
         const leftTopXY = {x: 330, y: 452};
         //(368, 490) 格子右上角 往左上推 ((220 - 145(格子大小)) / 2) 得到 (330, 452)
         const rightBottomXY = {x: 466, y: 344};
@@ -255,12 +291,17 @@ class Shogi {
 
         for(let i = 0; i < 9; i++) {
             for(let j = 0; j < 9; j++) {
-                let koma = this.#board.game[i][j];
+                let koma; 
+                //先後位置顛倒
+                if(facing) koma = this.#board.game[8-i][8-j];
+                else koma = this.#board.game[i][j];
                 if(koma == "0") continue;
+                //先後棋子朝向顛倒
                 if(facing) {
                     if(koma == koma.toUpperCase()) koma = koma.toLowerCase();
-                    if(koma == koma.toLowerCase()) koma = koma.toUpperCase();
+                    else if(koma == koma.toLowerCase()) koma = koma.toUpperCase();
                 }
+                //放置棋子
                 if(koma == koma.toUpperCase()) {
                     context.setTransform(1, 0, 0, 1, 0, 0);
                     context.translate(0, 0);
@@ -270,8 +311,8 @@ class Shogi {
                     
                 } else {
                     context.setTransform(1, 0, 0, 1, 0, 0);
-                    context.translate(0, canvas.height);
-                    context.scale(1, -1);
+                    context.translate(canvas.width, canvas.height);
+                    context.scale(-1, -1);
                     const komaimg = await Canvas.loadImage(`./pic/shogi-${koma.toLowerCase()}.png`);
                     context.drawImage(komaimg, rightBottomXY.x + blockSize * (8-j), rightBottomXY.y + blockSize * (8-i), imageSize, imageSize);
                 }
@@ -288,7 +329,50 @@ class Shogi {
         */
     }
 
+    /**
+     * 較驗輸入是否符合本系統的要求
+     * @param {string} content 要較驗的字串
+     * @return {boolean} 是否符合要求
+     */
+    static inputCheck(content) {
+        if(Number.isNaN(parseInt(content[0]))) {
+            if(content.length < 3 && content.length > 4) return false;
+            if(content.length === 3) {
+                if(content[0] !== '步' && content[0] !== '香' && content[0] !== '桂' && content[0] !== '銀' && 
+                    content[0] !== '金' && content[0] !== '角' && content[0] !== '飛')
+                    return false;
+                if(parseInt(content[1]) < 1 || parseInt(content[1]) > 9) return false;
+                if(KanjiSuujiCheck(content[2])) return false;
+                return true;
+            } else {
+                const str = content[0] + content[1];
+                if(str!== '步兵' && str !== '香車' && str !== '桂馬' && str !== '銀將' && str !== '金將' && str !== '角行' && str !== '飛車')
+                return false;
+                if(parseInt(content[2]) < 1 || parseInt(content[2]) > 9) return false;
+                if(KanjiSuujiCheck(content[3])) return false;
+                return true;
+            }
+        } else {
+            if(content.length < 4 && content.length > 5) return false;
+            if(parseInt(content[0]) < 1 || parseInt(content[0]) > 9) return false;
+            if(parseInt(content[2]) < 1 || parseInt(content[4]) > 9) return false;
+            if(KanjiSuujiCheck(content[1])) return false;
+            if(KanjiSuujiCheck(content[3])) return false;
+            if(content.length === 5) if(content[4] !== "+") return false;
+            return true;
+        }
+    }
+
+    static inputTranslate(content, isSente) {
+        //TODO: 移動或放棋轉化成統一格式，並消彌先後手造成的輸入不相同
+    }
+
     static komaSort() {
         //TODO: 將棋排序: 手持駒的顯示順序
     }
+}
+
+function KanjiSuujiCheck(str) {
+    return (str !== '一' && str !== '二' && str !== '三' && str !== '四' && str !== '八' && 
+        str !== '七' && str !== '六' && str !== '五' && str !== '九');
 }
