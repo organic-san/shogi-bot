@@ -1,4 +1,5 @@
 const Discord = require('discord.js');
+const Canvas = require('@napi-rs/canvas');
 
 module.exports = {
 	data: new Discord.SlashCommandBuilder()
@@ -106,6 +107,77 @@ module.exports = {
 
         let player = offensive <= 2 ? offensive : Math.floor(Math.random() * 2) + 1;
         let step = 0;
+        let board = new Shogi();
+        board.init();
+        let gameInfo = 
+            `遊戲: 將棋\n` + 
+            `先手☗: ${player === 1 ? user[0] : user[1]} (${player === 1 ? user[0].tag : user[1].tag})\n` + 
+            `後手☖: ${player === 2 ? user[0] : user[1]} (${player === 2 ? user[0].tag : user[1].tag})\n`;
+        let nowPlayer = 
+            `目前操作玩家: ${player === 1 ? user[0] : user[1]} (${player === 1 ? user[0].tag : user[1].tag})\n`;
+        const msgPlaying = "請輸入要下棋的位置。";
+        //TODO: 在這裡說明下棋的方式
+        const msgWaiting = "正在等待對方執行操作...";
+        const timelimit = 3;
+        let masu = "";
+
+        /**
+         * @type {Discord.Message<boolean>}
+         */
+        let nowBoard = await board.board();
+        message.forEach((msg, ind) => {
+            msg.edit({
+                content: 
+                    `${gameInfo}\n\n${nowPlayer}${player === (ind + 1) ? msgPlaying : msgPlaying}`,
+                files: [nowBoard],
+                components: []
+            })
+        })
+
+        let collector = [
+            message[0].channel.createMessageCollector({time: (player === 1 ? timelimit : 999) * 60 * 1000 }),
+            message[1].channel.createMessageCollector({time: (player === 2 ? timelimit : 999) * 60 * 1000 })
+        ]
+        mainMsg.edit("正在遊玩遊戲中...");
+
+        collector.forEach(async (col, index) => {
+            col.on("collect", async msg => {
+                if(msg.author.id !== user[index].id) return;
+                collector[index].resetTimer(timelimit * 60 * 1000);
+                if(player !== (index + 1)) 
+                    return msg.reply({content: '還沒有輪到你喔', allowedMentions: {repliedUser: false}});
+
+            });
+        });
+
+        collector.forEach(async (col, index) => {
+            col.on('end',async (c, r) => {
+                if(r !== "messageDelete" && r !== "end"){
+                    nowBoard = await board.board();
+                    message[index].edit({
+                        content: 
+                            `${gameInfo}\n\n` + 
+                            `由於你太久沒有回應，因此結束了這場遊戲。`,
+                        files: [nowBoard],
+                        components: []
+                    });
+                    message[(index + 1) % 2].edit({
+                        content: 
+                            `${gameInfo}\n\n` + 
+                            `由於對方太久沒有回應，因此結束了這場遊戲。`,
+                            files: [nowBoard],
+                        components: []
+                    });
+                    mainMsg.edit({
+                        content: 
+                            `${gameInfo}\n` + 
+                            "遊戲因為操作逾時而結束。",
+                        files: [nowBoard],
+                    }).catch(() => {});
+                    collector[(index + 1) % 2].stop('end');
+                }
+            })
+        })
         /*
         await mainMsg.edit("測試結束").catch(() => {});
         message.forEach((msg, ind) => {
@@ -126,12 +198,14 @@ class Shogi {
     #board;
     //手番については、先手番ならb、後手番ならwと表記します。（Black、Whiteの頭文字）
     constructor() {
-        this.#board.game = [];
+        this.#board = {
+            game: [],
+            sente: [],
+            gote: []
+        }
         for(let i = 0; i < 9; i++) {
             this.#board.game.push(['0', '0', '0', '0', '0', '0', '0', '0', '0', ]);
         }
-        this.#board.sente = [];
-        this.#board.gote = [];
     }
 
     init() {
@@ -166,11 +240,55 @@ class Shogi {
      * 
      * @param {number} facing 設為0時代表先手在下方，設為1時先手在上方
      */
-    board(facing) {
-        let text = "";
+    async board(facing) {
+        const canvas = Canvas.createCanvas(2304, 2304);
+		const context = canvas.getContext('2d');
+
+        const leftTopXY = {x: 330, y: 452};
+        //(368, 490) 格子右上角 往左上推 ((220 - 145(格子大小)) / 2) 得到 (330, 452)
+        const rightBottomXY = {x: 466, y: 344};
+        const blockSize = 161;
+        const imageSize = 220;
+
+        const background = await Canvas.loadImage('./pic/shogi-board.png');
+        context.drawImage(background, 0, 0, canvas.width, canvas.height);
+
+        for(let i = 0; i < 9; i++) {
+            for(let j = 0; j < 9; j++) {
+                let koma = this.#board.game[i][j];
+                if(koma == "0") continue;
+                if(facing) {
+                    if(koma == koma.toUpperCase()) koma = koma.toLowerCase();
+                    if(koma == koma.toLowerCase()) koma = koma.toUpperCase();
+                }
+                if(koma == koma.toUpperCase()) {
+                    context.setTransform(1, 0, 0, 1, 0, 0);
+                    context.translate(0, 0);
+                    context.scale(1, 1);
+                    const komaimg = await Canvas.loadImage(`./pic/shogi-${koma.toLowerCase()}.png`);
+                    context.drawImage(komaimg, leftTopXY.x + blockSize * j, leftTopXY.y + blockSize * i, imageSize, imageSize);
+                    
+                } else {
+                    context.setTransform(1, 0, 0, 1, 0, 0);
+                    context.translate(0, canvas.height);
+                    context.scale(1, -1);
+                    const komaimg = await Canvas.loadImage(`./pic/shogi-${koma.toLowerCase()}.png`);
+                    context.drawImage(komaimg, rightBottomXY.x + blockSize * (8-j), rightBottomXY.y + blockSize * (8-i), imageSize, imageSize);
+                }
+            }
+        }
+        //TODO: 先後手標記、下棋方標記、手持駒顯示
+        const attachment = new Discord.AttachmentBuilder(await canvas.encode('png'), { name: 'profile-image.png' });
+        return attachment;
+        /*
         if(!facing) {
             this.#board.gote
             
         }
+        */
+    }
+
+    static komaSort() {
+        //TODO: 將棋排序: 手持駒的顯示順序
     }
 }
