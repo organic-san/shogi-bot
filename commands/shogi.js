@@ -1,5 +1,6 @@
 const Discord = require('discord.js');
 const Canvas = require('@napi-rs/canvas');
+const simbol = ["☗", "☖"];
 
 module.exports = {
 	data: new Discord.SlashCommandBuilder()
@@ -27,7 +28,7 @@ module.exports = {
      */
 	async execute(interaction) {
 		const user = [interaction.user, interaction.options.getUser('player')]
-        let offensive = interaction.options.getNumber('offensive');
+        const offensive = interaction.options.getNumber('offensive');
         //const kinjite = interaction.options.getBoolean('kinjite');
         if(user[1].bot) return interaction.reply("無法向機器人發送遊玩邀請。");
         //TODO: AI五子棋玩家
@@ -35,8 +36,8 @@ module.exports = {
 
         const inputRule = "下棋輸入說明：\n" + 
         "移動棋子時，請根據(旗子原本的位置)(旗子移動後的位置)(是否升變，未輸入則不升變)的方式輸入。\n" +
-        "例如將棋子將從 `7七` 移動到 `7六`，請輸入 `7七7六`。\n" +
-        "需要升變的時候請在位置後加入 `+` 符號，例如將棋子從 `7四` 移動到 `7三` 並升變，請輸入 `7四7三+`。\n\n" +
+        "例如將棋子將從 `7七` 移動到 `7六`，請輸入 `7七7六` 或 `7776`。\n" +
+        "需要升變的時候請在位置後加入 `+` 符號，例如將棋子從 `7四` 移動到 `7三` 並升變，請輸入 `7四7三+` 或 `7473+`。\n\n" +
         "打入手上持有的旗子時，請輸入要打入的棋子名稱與打入的位置。\n" +
         "打入的棋子名稱請輸入 `步`、`香`、`桂`、`銀`、`金`、`角`、`飛` 的其中一種，" +
         "或是輸入 `步兵`、`香車`、`桂馬`、`銀將`、`金將`、`角行`、`飛車` 的其中一種。\n" +
@@ -116,22 +117,20 @@ module.exports = {
 
         await mainMsg.edit("對方同意遊玩邀請了! 即將開始遊戲...").catch(() => {});
 
-        offensive = offensive <= 1 ? offensive : Math.floor(Math.random() * 2);
         /**
          * @type {number} 先手的玩家
          */
-        const sente = offensive;
+        const sente = offensive <= 1 ? offensive : Math.floor(Math.random() * 2);;
         /**
          * @type {number} 後手的玩家
          */
-        const gote = (offensive + 1) % 2;
+        const gote = (sente + 1) % 2;
         /**
          * @type {number} 當下的玩家
          */
-        let player = offensive;
+        let player = sente;
         let step = 0;
         const board = new Shogi();
-        const simbol = ["☗", "☖"];
         board.init();
         let gameInfo = 
             `遊戲: 將棋\n` + 
@@ -148,8 +147,8 @@ module.exports = {
         message.forEach(async (msg, ind) => {
             msg.edit({
                 content:
-                    `${gameInfo}\n${nowPlayer}${ind == offensive ? msgPlaying : msgWaiting}`,
-                files: [await board.board(ind == offensive)],
+                    `${gameInfo}\n${nowPlayer}${ind == sente ? msgPlaying : msgWaiting}`,
+                files: [await board.board(ind == sente)],
                 components: []
             })
         })
@@ -167,15 +166,18 @@ module.exports = {
                 if(msg.author.id !== user[index].id) return;
                 collector[index].resetTimer(timelimit * 60 * 1000);
                 if(player !== (index))
-                    return msg.reply({content: '還沒有輪到你喔', allowedMentions: {repliedUser: false}});
+                    return msg.reply({content: '現在是對方的回合喔。', allowedMentions: {repliedUser: false}});
                 
                 //判斷現在的玩家是否為先手
-                const playerIsSente = (index === offensive);
+                const playerIsSente = (index === sente);
 
                 //輸入資料的格式檢查
-                if(!Shogi.inputCheck(msg.content)) return msg.reply({content: '位置資訊不符合格式，機器人無法解讀，請依照格式輸入。', allowedMentions: {repliedUser: false}});
+                if(!Shogi.inputCheck(msg.content)) 
+                    return msg.reply({content: '位置資訊不符合格式或輸入的位置超過棋盤範圍，機器人無法解讀，請依照格式輸入。', allowedMentions: {repliedUser: false}});
                 //輸入資料的統一化調整 & 消彌先後手盤面方向不同造成的輸入差異
-                const input = Shogi.inputTranslate(msg.content, playerIsSente)
+                const input = Shogi.inputTranslate(msg.content, playerIsSente);
+                const reason = board.checkLegitimacy(input, playerIsSente);
+                if(reason !== true) return msg.reply({content: '輸入錯誤：' + reason + '\n請重新輸入。', allowedMentions: {repliedUser: false}});
 
 
                 //TODO: 對執行結果做遊戲結束的檢定
@@ -187,8 +189,8 @@ module.exports = {
             col.on('end',async (c, r) => {
                 if(r !== "messageDelete" && r !== "end"){
                     //TODO: 修改勝負判定讓超時的一方為敗者，另一方為勝者
-                    const senteBoard = await board.board(0);
-                    const goteBoard = await board.board(1);
+                    const senteBoard = await board.board(true);
+                    const goteBoard = await board.board(false);
                     message[index].edit({
                         content: 
                             `${gameInfo}\n\n` + 
@@ -243,14 +245,74 @@ class Shogi {
         }
     }
 
+    static get Space() {
+        return "0";
+    }
+
+    static get King() {
+        return "k";
+    }
+
+    static get Rook() {
+        return "r";
+    }
+
+    static get RookPlus() {
+        return "r+";
+    }
+
+    static get Bishop() {
+        return "b";
+    }
+
+    static get BishopPlus() {
+        return "b+";
+    }
+
+    static get Gold() {
+        return "g";
+    }
+
+    static get Silver() {
+        return "s";
+    }
+
+    static get SilverPlus() {
+        return "s+";
+    }
+
+    static get Knight() {
+        return "n";
+    }
+
+    static get KnightPlus() {
+        return "n+";
+    }
+
+    static get Lance() {
+        return "l";
+    }
+
+    static get LancePlus() {
+        return "l+";
+    }
+
+    static get Pawn() {
+        return "p";
+    }
+
+    static get PawnPlus() {
+        return "p+";
+    }
+
     init() {
         this.#board.game = [
-            ['l', 'n', 's', 'g', 'k', 'g', 's', 'n', 'l'],
+            ['l', 'n', 's', '0', 'k', 'g', 's', 'n', 'l'],
             ['0', 'r', '0', '0', '0', '0', '0', 'b', '0'],
-            ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+            ['p', 'p', 'p', '0', 'p', 'p', 'p', 'p', 'p'],
             ['0', '0', '0', '0', '0', '0', '0', '0', '0'],
             ['0', '0', '0', '0', '0', '0', '0', '0', '0'],
-            ['0', '0', '0', '0', '0', '0', '0', '0', '0'],
+            ['0', '0', 'L', 'L', '0', '0', '0', '0', '0'],
             ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
             ['0', 'B', '0', '0', '0', '0', '0', 'R', '0'],
             ['L', 'N', 'S', 'G', 'K', 'G', 'S', 'N', 'L'],
@@ -273,9 +335,9 @@ class Shogi {
 
     /**
      * 
-     * @param {number} facing 設為0時代表先手在下方，設為1時先手在上方
+     * @param {boolean} isSente 設為true時代表回傳先手視角，否則回傳後手視角
      */
-    async board(facing) {
+    async board(isSente) {
         const canvas = Canvas.createCanvas(2304, 2304);
 		const context = canvas.getContext('2d');
 
@@ -293,11 +355,11 @@ class Shogi {
             for(let j = 0; j < 9; j++) {
                 let koma; 
                 //先後位置顛倒
-                if(facing) koma = this.#board.game[8-i][8-j];
+                if(!isSente) koma = this.#board.game[8-i][8-j];
                 else koma = this.#board.game[i][j];
                 if(koma == "0") continue;
                 //先後棋子朝向顛倒
-                if(facing) {
+                if(!isSente) {
                     if(koma == koma.toUpperCase()) koma = koma.toLowerCase();
                     else if(koma == koma.toLowerCase()) koma = koma.toUpperCase();
                 }
@@ -330,6 +392,112 @@ class Shogi {
     }
 
     /**
+     * 轉換符合輸入規則的文字成系統處理用的文字
+     * @param {string} content 符合格式(1a2b、3c4d+、P*5e等格式)的字串
+     * @param {boolean} isSente 是否先手，將影響判斷是哪一方的旗子。
+     * @return {string | boolean} 符合規則時回傳true，否則回傳不符合規則的原因的字串。
+     */
+    checkLegitimacy(content, isSente) {
+        //關於邊界範圍內的問題已經在輸入型態檢查那裏處理，不需要再額外判斷
+        if(Number.isNaN(parseInt(content[0]))) {
+            //TODO: 旗子放置
+        } else {
+            //旗子移動
+            const input = [parseInt(content[1]) - 1, 9 - parseInt(content[0]), parseInt(content[3]) - 1, 9 - parseInt(content[2])];
+            const shouhen = content[4] === "+" ? true : false;
+            const from = this.#board.game[input[0]][input[1]];
+            const fromIsSente = (from === from.toUpperCase()) && (from !== Shogi.Space);
+            const koma = from.toLowerCase();
+            const to = this.#board.game[input[2]][input[3]];
+            const toIsSente = (to === to.toUpperCase())  && (to !== Shogi.Space);
+            if(from === Shogi.Space) return "移動起點不存在旗子。";
+            if(isSente !== fromIsSente) return "移動起點的棋子是敵方棋子。";
+            if(isSente === toIsSente) return "移動目標中有我方棋子。";
+            if((input[1] === input[3]) && (input[0] === input[2])) return "移動起點與移動目標相同。";
+            if(shouhen && !(isSente ? ((input[2] < 3) || input[0] < 3) : (input[2] >= 6) || input[0] >= 6)) 
+                return "該移動目標沒辦法讓指定的棋子升變。";
+            if(shouhen && 
+                (koma === Shogi.King || koma === Shogi.PawnPlus || koma === Shogi.RookPlus || koma === Shogi.LancePlus ||
+                koma === Shogi.BishopPlus || koma === Shogi.KnightPlus || koma === Shogi.SilverPlus || koma === Shogi.Gold ))
+                return "指定的棋子(玉將、金將或成金)無法升變。";
+
+            //檢驗移動的合理性
+            if(koma === Shogi.Pawn){
+                if(input[1] === input[3] && (isSente ? input[0] - input[2]  === 1 : input[0] - input[2] === -1)) {
+                    if(!shouhen && (isSente ? (input[2] < 1) : (input[2] >= 8))) return "指定的棋子(步兵)在移動目標的位置時必須升變。";
+                    return true;
+                }
+                return "指定的棋子(步兵)無法做出這樣的移動。";
+            }
+            if(koma === Shogi.Gold || koma === Shogi.PawnPlus || koma === Shogi.RookPlus || koma === Shogi.LancePlus || 
+                koma === Shogi.BishopPlus || koma === Shogi.KnightPlus || koma === Shogi.SilverPlus ){
+                //垂直直線上下一格
+                if(input[1] === input[3] && (input[0] - input[2]  === 1 || input[0] - input[2] === -1))
+                    return true;
+                //水平直線左右一格
+                if(input[0] === input[2] && (input[1] - input[3]  === 1 || input[1] - input[3] === -1))
+                    return true;
+                //左上與右上兩格，根據是否先手決定方向
+                if(input[1] - input[3]  === 1 || input[1] - input[3] === -1)
+                    if(isSente ? (input[0] - input[2] === 1) : (input[0] - input[2] === -1))
+                        return true;
+                return "指定的棋子(金將或成金)無法做出這樣的移動。";
+            }
+            if(koma === Shogi.Silver){
+                //左上左下右上右下共四格
+                if((input[1] - input[3]  === 1 || input[1] - input[3] === -1))
+                    if((input[0] - input[2]  === 1 || input[0] - input[2] === -1))
+                        return true;
+                //正前方一格，根據是否先手決定方向
+                if(input[1] === input[3] && (isSente ? (input[0] - input[2] === 1) : (input[0] - input[2] === -1)))
+                    return true;
+                return "指定的棋子(銀將)無法做出這樣的移動。";
+            }
+            if(koma === Shogi.Knight){
+                //對斜前方兩格檢查，根據是否先手決定方向
+                if(input[1] - input[3]  === 1 || input[1] - input[3] === -1)
+                    if(isSente ? (input[0] - input[2] === 2) : (input[0] - input[2] === -2)){
+                        if(!shouhen && (isSente ? (input[2] < 2) : (input[2] >= 7))) return "指定的棋子(桂馬)在移動目標的位置時必須升變。";
+                        return true;
+                    }
+                return "指定的棋子(桂馬)無法做出這樣的移動。";
+            }
+            if(koma === Shogi.Lance){
+                if(input[1] === input[3] && (isSente ? (input[0] > input[2]) : (input[0] < input[2]))) {
+                    for(let i = Math.min(input[0], input[2]) + 1; i < Math.max(input[0], input[2]); i++) 
+                        if(this.#board.game[i][input[1]] !== Shogi.Space) return"指定的棋子(香車)在移動起點與移動目標中有其他棋子。";
+                    if(!shouhen && (isSente ? (input[2] < 1) : (input[2] >= 8))) return "指定的棋子(香車)在移動目標的位置時必須升變。";
+                    return true;
+                }
+                return "指定的棋子(香車)無法做出這樣的移動。";
+            }
+            if(koma === Shogi.Rook){
+                //TODO: 飛車的移動檢查
+                return "指定的棋子(飛車)無法做出這樣的移動。";
+            }
+            if(koma === Shogi.Bishop){
+                //TODO: 角行的移動檢查
+                return "指定的棋子(角行)無法做出這樣的移動。";
+            }
+            if(koma === Shogi.RookPlus){
+                //TODO: 角行的移動檢查
+                return "指定的棋子(龍王)無法做出這樣的移動。";
+            }
+            if(koma === Shogi.BishopPlus){
+                //TODO: 龍馬的移動檢查
+                return "指定的棋子(龍馬)無法做出這樣的移動。";
+            }
+            if(koma === Shogi.King){
+                if((input[1] - input[3]  <= 1 && input[1] - input[3] >= -1))
+                    if((input[0] - input[2]  <= 1 && input[0] - input[2] >= -1))
+                        return true;
+                return "指定的棋子(玉將)無法做出這樣的移動。";
+            }
+        }
+        //TODO: 較驗殊入是否符合規則
+    }
+
+    /**
      * 較驗輸入是否符合本系統的要求
      * @param {string} content 要較驗的字串
      * @return {boolean} 是否符合要求
@@ -338,33 +506,61 @@ class Shogi {
         if(Number.isNaN(parseInt(content[0]))) {
             if(content.length < 3 && content.length > 4) return false;
             if(content.length === 3) {
-                if(content[0] !== '步' && content[0] !== '香' && content[0] !== '桂' && content[0] !== '銀' && 
-                    content[0] !== '金' && content[0] !== '角' && content[0] !== '飛')
-                    return false;
+                if(KomaNameLegitimate.get(content[0])) return false;
                 if(parseInt(content[1]) < 1 || parseInt(content[1]) > 9) return false;
-                if(KanjiSuujiCheck(content[2])) return false;
+                if(!kanjiToNumber.get(content[2])) return false;
                 return true;
             } else {
-                const str = content[0] + content[1];
-                if(str!== '步兵' && str !== '香車' && str !== '桂馬' && str !== '銀將' && str !== '金將' && str !== '角行' && str !== '飛車')
-                return false;
+                if(!KomaNameLegitimate.get(content[0] + content[1])) return false;
                 if(parseInt(content[2]) < 1 || parseInt(content[2]) > 9) return false;
-                if(KanjiSuujiCheck(content[3])) return false;
+                if(!kanjiToNumber.get(content[3])) return false;
                 return true;
             }
         } else {
             if(content.length < 4 && content.length > 5) return false;
             if(parseInt(content[0]) < 1 || parseInt(content[0]) > 9) return false;
             if(parseInt(content[2]) < 1 || parseInt(content[4]) > 9) return false;
-            if(KanjiSuujiCheck(content[1])) return false;
-            if(KanjiSuujiCheck(content[3])) return false;
+            if(!kanjiToNumber.get(content[1])) return false;
+            if(!kanjiToNumber.get(content[3])) return false;
             if(content.length === 5) if(content[4] !== "+") return false;
             return true;
         }
     }
 
+    /**
+     * 轉換符合輸入規則的文字成系統處理用的文字
+     * @param {string} content 要轉換的字串
+     * @param {string} isSente 是否先手，若非先手將進行棋盤位置顛倒的處理
+     * @return {string} 轉換後的文字
+     */
     static inputTranslate(content, isSente) {
-        //TODO: 移動或放棋轉化成統一格式，並消彌先後手造成的輸入不相同
+        let returnVal = "";
+        //將文字輸入(1四2五)轉換成數字模式(1425)
+        //將文字輸入(桂2五)轉換成數字模式(N*25)
+        if(Number.isNaN(parseInt(content[0]))) {
+            if(content.length === 3) {
+                returnVal = KomaNameLegitimate.get(content[0]);
+                returnVal += ("*" + content[1] + kanjiToNumber.get(content[2]));
+            } else {
+                returnVal = KomaNameLegitimate.get(content[0] + content[1]);
+                returnVal += ("*" + content[2] + kanjiToNumber.get(content[3]));
+            }
+        } else {
+            returnVal = (content[0] + kanjiToNumber.get(content[1]) + content[2] + kanjiToNumber.get(content[3]));
+            if(content.length === 5) returnVal += content[4];
+        }
+
+        returnVal = returnVal.split('');
+        //消彌先後手的盤面會顛倒造成的輸入不相同
+        if(!isSente) {
+            if(!Number.isNaN(parseInt(content[0]))) {
+                returnVal[0] = (10 - parseInt(returnVal[0])).toString();
+                returnVal[1] = (10 - parseInt(returnVal[1])).toString();
+            }
+            returnVal[2] = (10 - parseInt(returnVal[2])).toString();
+            returnVal[3] = (10 - parseInt(returnVal[3])).toString();
+        }
+        return returnVal.join('');
     }
 
     static komaSort() {
@@ -372,7 +568,24 @@ class Shogi {
     }
 }
 
-function KanjiSuujiCheck(str) {
-    return (str !== '一' && str !== '二' && str !== '三' && str !== '四' && str !== '八' && 
-        str !== '七' && str !== '六' && str !== '五' && str !== '九');
-}
+const kanjiToNumber = new Map([
+    ['一', '1'], ['1', '1'],
+    ['二', '2'], ['2', '2'],
+    ['三', '3'], ['3', '3'],
+    ['四', '4'], ['4', '4'],
+    ['五', '5'], ['5', '5'],
+    ['六', '6'], ['6', '6'],
+    ['七', '7'], ['7', '7'],
+    ['八', '8'], ['8', '8'],
+    ['九', '9'], ['9', '9'],
+]);
+
+const KomaNameLegitimate = new Map([
+    ['步', 'P'], ['步兵', 'P'],
+    ['香', 'L'], ['香車', 'L'],
+    ['桂', 'N'], ['桂馬', 'N'],
+    ['銀', 'S'], ['銀將', 'S'],
+    ['金', 'G'], ['金將', 'G'],
+    ['角', 'B'], ['角行', 'B'],
+    ['飛', 'R'], ['飛車', 'R'],
+]);
