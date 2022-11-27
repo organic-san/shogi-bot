@@ -178,7 +178,7 @@ module.exports = {
                 const input = Shogi.inputTranslate(msg.content, playerIsSente);
                 const reason = board.checkLegitimacy(input, playerIsSente);
                 if(reason !== true) return msg.reply({content: '輸入錯誤：' + reason + '\n請重新輸入。', allowedMentions: {repliedUser: false}});
-
+                board.putKoma(input, playerIsSente);
 
                 //TODO: 對執行結果做遊戲結束的檢定
                 //TODO: 更新遊玩過程資料並傳送給玩家與主訊息，主訊息的圖片以先手方顯示的版本為主
@@ -390,7 +390,48 @@ class Shogi {
                 }
             }
         }
-        //TODO: 先後手標記、下棋方標記、手持駒顯示
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.translate(0, 0);
+        context.scale(1, 1);
+        const sente = await Canvas.loadImage('./pic/shogi-sente.png');
+        const gote = await Canvas.loadImage('./pic/shogi-gote.png');
+        if(isSente) {
+            context.drawImage(sente, 50, 1981, 500, 281);
+            context.drawImage(gote, 1761, 43, 500, 281);
+        } else {
+            context.drawImage(sente, 1754, 43, 500, 281);
+            context.drawImage(gote, 43, 1981, 500, 281);
+        }
+
+        const playerMark = await Canvas.loadImage(`./pic/shogi-player.png`);
+        if(isSente) context.drawImage(playerMark, 26, 1648, 300, 300);
+        else context.drawImage(playerMark, 1978, 356, 300, 300);
+
+        const rowMax = 18;
+
+        for(let i = 0; i < (isSente ? this.#board.senteKoma.length : this.#board.goteKoma.length); i++) {
+            const koma = await Canvas.loadImage(
+                './pic/shogi-' + (isSente ? this.#board.senteKoma[i] : this.#board.goteKoma[i]).toLowerCase() + '.png'
+            );
+            context.drawImage(
+                koma, 
+                500 + (i % rowMax) * 90 + 45 * (Math.floor(i / rowMax)), 
+                2121 - (imageSize / 2) + 105 * (Math.floor(i / rowMax)), 
+                imageSize, imageSize);
+        }
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.translate(canvas.width, canvas.height);
+        context.scale(-1, -1);
+        for(let i = 0; i < (isSente ? this.#board.goteKoma.length : this.#board.senteKoma.length); i++) {
+            const koma = await Canvas.loadImage(
+                './pic/shogi-' + (isSente ? this.#board.goteKoma[i] : this.#board.senteKoma[i]).toLowerCase() + '.png'
+            );
+            context.drawImage(
+                koma, 
+                500 + (i % rowMax) * 90 + 45 * (Math.floor(i / rowMax)), 
+                2121 - (imageSize / 2) + 105 * (Math.floor(i / rowMax)), 
+                imageSize, imageSize);
+        }
         const attachment = new Discord.AttachmentBuilder(await canvas.encode('png'), { name: 'profile-image.png' });
         return attachment;
         /*
@@ -567,7 +608,6 @@ class Shogi {
                     for(let i = Math.min(input[0], input[2]) + 1, j = Math.max(input[1], input[3]) - 1;
                          i < Math.max(input[0], input[2]); 
                          i++, j--) {
-                            console.log(`${i}, ${j}`)
                             if(this.#board.game[i][j] !== Shogi.Space) return"指定的棋子(龍馬)在移動起點與移動目標中有其他棋子。";
                          }
                     return true;
@@ -586,6 +626,15 @@ class Shogi {
                 return "指定的棋子(玉將)無法做出這樣的移動。";
             }
         }
+    }
+
+    /**
+     * 轉換符合輸入規則的文字成系統處理用的文字
+     * @param {string} content 符合格式(1122、3344+、P*55等格式)的字串
+     * @param {boolean} isSente 是否先手，將影響判斷是哪一方的旗子。
+     */
+    putKoma(content, isSente) {
+        //TODO: 放置棋子
     }
 
     /**
