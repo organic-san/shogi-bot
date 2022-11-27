@@ -31,7 +31,7 @@ module.exports = {
         const offensive = interaction.options.getNumber('offensive');
         //const kinjite = interaction.options.getBoolean('kinjite');
         if(user[1].bot) return interaction.reply("無法向機器人發送遊玩邀請。");
-        //TODO: AI五子棋玩家
+        //TODO: AI將棋玩家
         if(user[1].id === user[0].id) return interaction.reply("無法向自己發送遊玩邀請。");
 
         const inputRule = "下棋輸入說明：\n" + 
@@ -59,16 +59,16 @@ module.exports = {
                 .setCustomId('OK')
                 .setStyle(Discord.ButtonStyle.Primary)
             );
+
         /**
          * @type {Discord.Message<boolean>}
          */
-
-         let mainMsg = await interaction.reply({
+        const mainMsg = await interaction.reply({
             content: "已經將說明與開始遊玩發送至你的私訊，請檢查私訊...", 
             fetchReply: true
         });
 
-        let lc =`\n\n點選下方按鈕，向 ${user[1]} (${user[1].tag}) 發送邀請。`
+        const lc =`\n\n點選下方按鈕，向 ${user[1]} (${user[1].tag}) 發送邀請。`
         let isErr = false;
         /**
          * @type {Array<Discord.Message<boolean>>}
@@ -87,7 +87,7 @@ module.exports = {
             await i.deferUpdate();
             return i.customId === 'OK'
         };
-        let p1btn = await message[0].awaitMessageComponent({ filter: msgfilter, componentType: Discord.ComponentType.Button, time: 5 * 60 * 1000 })
+        const p1btn = await message[0].awaitMessageComponent({ filter: msgfilter, componentType: Discord.ComponentType.Button, time: 5 * 60 * 1000 })
             .catch(() => {});
         if (!p1btn) {
             return mainMsg.edit({content: "由於太久沒有收到反映，因此取消向對方傳送邀請。", components: []}).catch(() => {});
@@ -108,7 +108,7 @@ module.exports = {
             message[0].edit("已取消遊戲，因為我無法傳送訊息給" + user[1] + " (" + user[1].tag + ")" + "。");
             return mainMsg.edit("已取消遊戲，因為我無法傳送訊息給" + user[1] + " (" + user[1].tag + ")" + "。").catch(() => {});
         }
-        let p2btn = await message[1].awaitMessageComponent({ filter: msgfilter, componentType: Discord.ComponentType.Button, time: 5 * 60 * 1000 });
+        const p2btn = await message[1].awaitMessageComponent({ filter: msgfilter, componentType: Discord.ComponentType.Button, time: 5 * 60 * 1000 });
         if (!p2btn) {
             mainMsg.edit("對方並未對邀請做出回覆，因此取消開始遊戲。");
             message[0].edit("對方並未對邀請做出回覆，因此取消開始遊玩將棋。");
@@ -132,14 +132,13 @@ module.exports = {
         let step = 0;
         const board = new Shogi();
         board.init();
-        let gameInfo = 
+        const gameInfo = 
             `遊戲: 將棋\n` + 
             `先手${simbol[sente]}: ${user[sente]} (${user[sente].tag})\n` + 
             `後手${simbol[gote]}: ${user[gote]} (${user[gote].tag})\n`;
         let nowPlayer = 
             `目前操作玩家: ${user[sente]} (${user[sente].tag})\n`;
         const msgPlaying = "請輸入要下棋的位置。\n\n" + inputRule;
-        //TODO: 在這裡說明下棋的方式
         const msgWaiting = "正在等待對方執行操作...";
         const timelimit = 3;
         let masu = "";
@@ -155,7 +154,7 @@ module.exports = {
 
         //TODO: 放棄按鈕與它的偵測，按下放棄按鈕視同按下方認輸
 
-        let collector = [
+        const collector = [
             message[0].channel.createMessageCollector({time: (player === 1 ? timelimit : 999) * 60 * 1000 }),
             message[1].channel.createMessageCollector({time: (player === 2 ? timelimit : 999) * 60 * 1000 })
         ]
@@ -180,9 +179,9 @@ module.exports = {
                 if(reason !== true) return msg.reply({content: '輸入錯誤：' + reason + '\n請重新輸入。', allowedMentions: {repliedUser: false}});
                 board.putKoma(input, playerIsSente);
 
-                //TODO: 遊戲終止設定
                 if(false) {
                     
+                    //TODO: 對執行結果做遊戲結束的檢定
                 } else {
                     collector[(player + 1) % 2].resetTimer(timelimit * 60 * 1000);
                     collector[player].resetTimer(999 * 60 * 1000);
@@ -191,10 +190,9 @@ module.exports = {
                     const senteBoard = await board.board(true, player === sente);
                     const goteBoard = await board.board(false, player === gote);
 
-                    nowPlayer = 
-                        `目前操作玩家: ${user[player]} (${user[player].tag})\n`;
+                    nowPlayer = `目前操作玩家: ${user[player]} (${user[player].tag})\n`;
                     //masu = msg.content.slice(0, 1).toUpperCase() + msg.content.slice(1);
-                    let kmsg = message[index];
+                    const kmsg = message[index];
                     message[index] = await user[index].send({
                         content:
                             `${gameInfo}\n${nowPlayer}${msgWaiting}`,
@@ -209,14 +207,11 @@ module.exports = {
                     });
                     await kmsg.delete();
                     mainMsg.edit({
-                        content: `${gameInfo}\n${nowPlayer}"遊戲正在進行中..."`,
+                        content: `${gameInfo}\n${nowPlayer}遊戲正在進行中...`,
                         files: [senteBoard],
                         components: []
                     }).catch(() => {});
                 }
-
-                //TODO: 對執行結果做遊戲結束的檢定
-                //TODO: 更新遊玩過程資料並傳送給玩家與主訊息，主訊息的圖片以先手方顯示的版本為主
             });
         });
 
@@ -384,15 +379,17 @@ class Shogi {
      * @param {boolean} isPlayer 下棋方是否為下方玩家
      */
     async board(isSente, isPlayer) {
-        const canvas = Canvas.createCanvas(2304, 2304);
+        const canvasSize = 768;
+        const scale = canvasSize / 2304;
+        const canvas = Canvas.createCanvas(canvasSize, canvasSize);
 		const context = canvas.getContext('2d');
 
         //座標指定
-        const leftTopXY = {x: 330, y: 452};
+        const leftTopXY = {x: 330 * scale, y: 452 * scale};
         //(368, 490) 格子右上角 往左上推 ((220 - 145(格子大小)) / 2) 得到 (330, 452)
-        const rightBottomXY = {x: 466, y: 344};
-        const blockSize = 161;
-        const imageSize = 220;
+        const rightBottomXY = {x: 466 * scale, y: 344 * scale};
+        const blockSize = 161 * scale;
+        const imageSize = 220 * scale;
 
         const background = await Canvas.loadImage('./pic/shogi-board.png');
         context.drawImage(background, 0, 0, canvas.width, canvas.height);
@@ -426,34 +423,40 @@ class Shogi {
                 }
             }
         }
+
+        const LRWid = 352 * scale;
+        const TBWid = 366 * scale;
+        const markSize = {x: 500 * scale, y: 281 * scale};
+        const markLeftDown = {x: 50 * scale, y: (canvasSize - TBWid / 2 - markSize.y / 2)};
+        const markRightTop = {x: (canvasSize - markSize.x - 50 * scale), y: (TBWid / 2 - markSize.y / 2)};
+
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.translate(0, 0);
         context.scale(1, 1);
         const sente = await Canvas.loadImage('./pic/shogi-sente.png');
         const gote = await Canvas.loadImage('./pic/shogi-gote.png');
-        const markSize = [500, 281];
-        const markLeftDown = [50, 1981];
-        const markRightTop = [1754, 43];
         if(isSente) {
-            context.drawImage(sente, markLeftDown[0], markLeftDown[1], markSize[0], markSize[1]);
-            context.drawImage(gote, markRightTop[0], markRightTop[1], markSize[0], markSize[1]);
+            context.drawImage(sente, markLeftDown.x, markLeftDown.y, markSize.x, markSize.y);
+            context.drawImage(gote, markRightTop.x, markRightTop.y, markSize.x, markSize.y);
         } else {
-            context.drawImage(sente, markRightTop[0], markRightTop[1], markSize[0], markSize[1]);
-            context.drawImage(gote, markLeftDown[0], markLeftDown[1], markSize[0], markSize[1]);
+            context.drawImage(sente, markRightTop.x, markRightTop.y, markSize.x, markSize.y);
+            context.drawImage(gote, markLeftDown.x, markLeftDown.y, markSize.x, markSize.y);
         }
-        const playingMarkSize = 300
-        const playingMarkLeftDown = [26, 1648];
-        const playingMarkRightTop = [1978, 356];
+
+        const playingMarkSize = 300 * scale;
+        const playingMarkLeftDown = {x: (LRWid - playingMarkSize) / 2, y: canvasSize - TBWid - playingMarkSize + 20 * scale};
+        const playingMarkRightTop = {x: canvasSize - LRWid / 2 - playingMarkSize / 2, y: TBWid - 10 * scale};
+
         if(isPlayer !== 2) {
             const playerMark = await Canvas.loadImage(`./pic/shogi-player.png`);
-            if(isPlayer) context.drawImage(playerMark, playingMarkLeftDown[0], playingMarkLeftDown[1], playingMarkSize, playingMarkSize);
-            else context.drawImage(playerMark, playingMarkRightTop[0], playingMarkRightTop[1], playingMarkSize, playingMarkSize);
+            if(isPlayer) context.drawImage(playerMark, playingMarkLeftDown.x, playingMarkLeftDown.y, playingMarkSize, playingMarkSize);
+            else context.drawImage(playerMark, playingMarkRightTop.x, playingMarkRightTop.y, playingMarkSize, playingMarkSize);
         }
 
         const rowMax = 18;
-        const baseKomaPos = [500, 2121];
-        const komaWid = 90;
-        const komaHei = 105;
+        const baseKomaPos = {x: markSize.x, y: canvasSize - TBWid / 2};
+        const komaWid = 90 * scale;
+        const komaHei = 105 * scale;
 
         for(let i = 0; i < (isSente ? this.#board.senteKoma.length : this.#board.goteKoma.length); i++) {
             const koma = await Canvas.loadImage(
@@ -461,8 +464,8 @@ class Shogi {
             );
             context.drawImage(
                 koma, 
-                baseKomaPos[0] + (i % rowMax) * komaWid + komaWid / 2 * (Math.floor(i / rowMax)), 
-                baseKomaPos[1] - (imageSize / 2) + komaHei * (Math.floor(i / rowMax)), 
+                baseKomaPos.x + (i % rowMax) * komaWid + komaWid / 2 * (Math.floor(i / rowMax)), 
+                baseKomaPos.y - (imageSize / 2) + komaHei * (Math.floor(i / rowMax)), 
                 imageSize, imageSize);
         }
         context.setTransform(1, 0, 0, 1, 0, 0);
@@ -474,8 +477,8 @@ class Shogi {
             );
             context.drawImage(
                 koma, 
-                baseKomaPos[0] + (i % rowMax) * komaWid + komaWid / 2 * (Math.floor(i / rowMax)), 
-                baseKomaPos[1] - (imageSize / 2) + komaHei * (Math.floor(i / rowMax)), 
+                baseKomaPos.x + (i % rowMax) * komaWid + komaWid / 2 * (Math.floor(i / rowMax)), 
+                baseKomaPos.y - (imageSize / 2) + komaHei * (Math.floor(i / rowMax)), 
                 imageSize, imageSize);
         }
         const attachment = new Discord.AttachmentBuilder(await canvas.encode('png'), { name: 'profile-image.png' });
@@ -501,7 +504,7 @@ class Shogi {
             const temochi = (isSente ? this.#board.senteKoma : this.#board.goteKoma);
             if(!temochi.includes(koma)) return "手上並沒有這枚棋子。";
             const input = [parseInt(content[3]) - 1, 9 - parseInt(content[2])];
-            const to = this.#board.game[input[2]][input[3]];
+            const to = this.#board.game[input[0]][input[1]];
             if(to !== Shogi.Space) return "放置棋子的位置已經有其他棋子。";
             if((koma === Shogi.Pawn || koma === Shogi.Lance) && (isSente ? (input[0] < 1) : (input[0] >= 8)))
                 return "放置在此位置會使棋子無法移動。";
@@ -698,10 +701,10 @@ class Shogi {
                 t = t.toLowerCase();
                 if(isSente) {
                     this.#board.senteKoma.push(t);
-                    this.#board.senteKoma = Shogi.komaSort(this.#board.senteKoma);
+                    this.komaSortSente();
                 } else {
                     this.#board.goteKoma.push(t);
-                    this.#board.goteKoma = Shogi.komaSort(this.#board.goteKoma);
+                    this.komaSortGote();
                 }
             }
             if(content.length === 5) {
@@ -779,13 +782,13 @@ class Shogi {
         return returnVal.join('');
     }
 
-    /**
-     * 
-     * @param {Array<string>} arr 
-     */
-    static komaSort(arr) {
-        return arr.sort((a, b) => (KomaToSortNumber.get(a) - KomaToSortNumber.get(b)));
+    komaSortSente() {
+         this.#board.senteKoma.sort((a, b) => (KomaToSortNumber.get(a) - KomaToSortNumber.get(b)));
     }
+
+    komaSortGote() {
+        this.#board.goteKoma.sort((a, b) => (KomaToSortNumber.get(a) - KomaToSortNumber.get(b)));
+   }
 }
 
 const kanjiToNumber = new Map([
@@ -801,21 +804,21 @@ const kanjiToNumber = new Map([
 ]);
 
 const KomaNameLegitimate = new Map([
-    ['步', 'P'], ['步兵', 'P'],
-    ['香', 'L'], ['香車', 'L'],
-    ['桂', 'N'], ['桂馬', 'N'],
-    ['銀', 'S'], ['銀將', 'S'],
-    ['金', 'G'], ['金將', 'G'],
-    ['角', 'B'], ['角行', 'B'],
-    ['飛', 'R'], ['飛車', 'R'],
+    ['步', 'P'], ['步兵', 'P'], ['P', 'P'], ['p', 'P'],
+    ['香', 'L'], ['香車', 'L'], ['L', 'L'], ['l', 'L'],
+    ['桂', 'N'], ['桂馬', 'N'], ['N', 'N'], ['n', 'N'],
+    ['銀', 'S'], ['銀將', 'S'], ['S', 'S'], ['s', 'S'],
+    ['金', 'G'], ['金將', 'G'], ['G', 'G'], ['g', 'G'],
+    ['角', 'B'], ['角行', 'B'], ['B', 'B'], ['b', 'B'],
+    ['飛', 'R'], ['飛車', 'R'], ['R', 'R'], ['r', 'R'],
 ]);
 
 const KomaToSortNumber = new Map([
-    ['p', '7'], 
-    ['l', '6'],
-    ['n', '5'],
-    ['s', '4'],
-    ['g', '3'],
-    ['b', '2'],
-    ['r', '1'],
+    ['p', 1], 
+    ['l', 2],
+    ['n', 3],
+    ['s', 4],
+    ['g', 5],
+    ['b', 6],
+    ['r', 7],
 ]);
