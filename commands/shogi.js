@@ -431,21 +431,29 @@ class Shogi {
         context.scale(1, 1);
         const sente = await Canvas.loadImage('./pic/shogi-sente.png');
         const gote = await Canvas.loadImage('./pic/shogi-gote.png');
+        const markSize = [500, 281];
+        const markLeftDown = [50, 1981];
+        const markRightTop = [1754, 43];
         if(isSente) {
-            context.drawImage(sente, 50, 1981, 500, 281);
-            context.drawImage(gote, 1761, 43, 500, 281);
+            context.drawImage(sente, markLeftDown[0], markLeftDown[1], markSize[0], markSize[1]);
+            context.drawImage(gote, markRightTop[0], markRightTop[1], markSize[0], markSize[1]);
         } else {
-            context.drawImage(sente, 1754, 43, 500, 281);
-            context.drawImage(gote, 43, 1981, 500, 281);
+            context.drawImage(sente, markRightTop[0], markRightTop[1], markSize[0], markSize[1]);
+            context.drawImage(gote, markLeftDown[0], markLeftDown[1], markSize[0], markSize[1]);
         }
-
+        const playingMarkSize = 300
+        const playingMarkLeftDown = [26, 1648];
+        const playingMarkRightTop = [1978, 356];
         if(isPlayer !== 2) {
             const playerMark = await Canvas.loadImage(`./pic/shogi-player.png`);
-            if(isPlayer) context.drawImage(playerMark, 26, 1648, 300, 300);
-            else context.drawImage(playerMark, 1978, 356, 300, 300);
+            if(isPlayer) context.drawImage(playerMark, playingMarkLeftDown[0], playingMarkLeftDown[1], playingMarkSize, playingMarkSize);
+            else context.drawImage(playerMark, playingMarkRightTop[0], playingMarkRightTop[1], playingMarkSize, playingMarkSize);
         }
 
         const rowMax = 18;
+        const baseKomaPos = [500, 2121];
+        const komaWid = 90;
+        const komaHei = 105;
 
         for(let i = 0; i < (isSente ? this.#board.senteKoma.length : this.#board.goteKoma.length); i++) {
             const koma = await Canvas.loadImage(
@@ -453,8 +461,8 @@ class Shogi {
             );
             context.drawImage(
                 koma, 
-                500 + (i % rowMax) * 90 + 45 * (Math.floor(i / rowMax)), 
-                2121 - (imageSize / 2) + 105 * (Math.floor(i / rowMax)), 
+                baseKomaPos[0] + (i % rowMax) * komaWid + komaWid / 2 * (Math.floor(i / rowMax)), 
+                baseKomaPos[1] - (imageSize / 2) + komaHei * (Math.floor(i / rowMax)), 
                 imageSize, imageSize);
         }
         context.setTransform(1, 0, 0, 1, 0, 0);
@@ -466,8 +474,8 @@ class Shogi {
             );
             context.drawImage(
                 koma, 
-                500 + (i % rowMax) * 90 + 45 * (Math.floor(i / rowMax)), 
-                2121 - (imageSize / 2) + 105 * (Math.floor(i / rowMax)), 
+                baseKomaPos[0] + (i % rowMax) * komaWid + komaWid / 2 * (Math.floor(i / rowMax)), 
+                baseKomaPos[1] - (imageSize / 2) + komaHei * (Math.floor(i / rowMax)), 
                 imageSize, imageSize);
         }
         const attachment = new Discord.AttachmentBuilder(await canvas.encode('png'), { name: 'profile-image.png' });
