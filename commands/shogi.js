@@ -258,7 +258,7 @@ class Shogi {
     }
 
     static get RookPlus() {
-        return "r+";
+        return "+r";
     }
 
     static get Bishop() {
@@ -266,7 +266,7 @@ class Shogi {
     }
 
     static get BishopPlus() {
-        return "b+";
+        return "+b";
     }
 
     static get Gold() {
@@ -278,7 +278,7 @@ class Shogi {
     }
 
     static get SilverPlus() {
-        return "s+";
+        return "+s";
     }
 
     static get Knight() {
@@ -286,7 +286,7 @@ class Shogi {
     }
 
     static get KnightPlus() {
-        return "n+";
+        return "+n";
     }
 
     static get Lance() {
@@ -294,7 +294,7 @@ class Shogi {
     }
 
     static get LancePlus() {
-        return "l+";
+        return "+l";
     }
 
     static get Pawn() {
@@ -302,17 +302,17 @@ class Shogi {
     }
 
     static get PawnPlus() {
-        return "p+";
+        return "+p";
     }
 
     init() {
         this.#board.game = [
-            ['l', 'n', 's', '0', 'k', 'g', 's', 'n', 'l'],
+            ['l', 'n', 's', 'g', 'k', 'g', 's', 'n', 'l'],
             ['0', 'r', '0', '0', '0', '0', '0', 'b', '0'],
-            ['p', 'p', 'p', '0', 'p', 'p', 'p', 'p', 'p'],
+            ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
             ['0', '0', '0', '0', '0', '0', '0', '0', '0'],
             ['0', '0', '0', '0', '0', '0', '0', '0', '0'],
-            ['0', '0', 'L', 'L', '0', '0', '0', '0', '0'],
+            ['0', '0', '0', '0', '0', '0', '0', '0', '0'],
             ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
             ['0', 'B', '0', '0', '0', '0', '0', 'R', '0'],
             ['L', 'N', 'S', 'G', 'K', 'G', 'S', 'N', 'L'],
@@ -330,6 +330,16 @@ class Shogi {
         先手の歩：P、後手の歩：p （Pawnの頭文字）
 
         駒が成った状態を表記するには、駒の文字の前に+をつけます。先手のと金は+Pとなります。
+
+            ['l', 'n', 's', 'g', 'k', 'g', 's', 'n', 'l'],
+            ['0', 'r', '0', '0', '0', '0', '0', 'b', '0'],
+            ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+            ['0', '0', '0', '0', '0', '0', '0', '0', '0'],
+            ['0', '0', '0', '0', '0', '0', '0', '0', '0'],
+            ['0', '0', '0', '0', '0', '0', '0', '0', '0'],
+            ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+            ['0', 'B', '0', '0', '0', '0', '0', 'R', '0'],
+            ['L', 'N', 'S', 'G', 'K', 'G', 'S', 'N', 'L'],
         */
     }
 
@@ -412,8 +422,8 @@ class Shogi {
             const toIsSente = (to === to.toUpperCase())  && (to !== Shogi.Space);
             if(from === Shogi.Space) return "移動起點不存在旗子。";
             if(isSente !== fromIsSente) return "移動起點的棋子是敵方棋子。";
-            if(isSente === toIsSente) return "移動目標中有我方棋子。";
             if((input[1] === input[3]) && (input[0] === input[2])) return "移動起點與移動目標相同。";
+            if(isSente === toIsSente) return "移動目標中有我方棋子。";
             if(shouhen && !(isSente ? ((input[2] < 3) || input[0] < 3) : (input[2] >= 6) || input[0] >= 6)) 
                 return "該移動目標沒辦法讓指定的棋子升變。";
             if(shouhen && 
@@ -429,8 +439,8 @@ class Shogi {
                 }
                 return "指定的棋子(步兵)無法做出這樣的移動。";
             }
-            if(koma === Shogi.Gold || koma === Shogi.PawnPlus || koma === Shogi.RookPlus || koma === Shogi.LancePlus || 
-                koma === Shogi.BishopPlus || koma === Shogi.KnightPlus || koma === Shogi.SilverPlus ){
+            if(koma === Shogi.Gold || koma === Shogi.PawnPlus || koma === Shogi.LancePlus || 
+                koma === Shogi.KnightPlus || koma === Shogi.SilverPlus ){
                 //垂直直線上下一格
                 if(input[1] === input[3] && (input[0] - input[2]  === 1 || input[0] - input[2] === -1))
                     return true;
@@ -463,6 +473,7 @@ class Shogi {
                 return "指定的棋子(桂馬)無法做出這樣的移動。";
             }
             if(koma === Shogi.Lance){
+                //棋子前方連續空盤判定
                 if(input[1] === input[3] && (isSente ? (input[0] > input[2]) : (input[0] < input[2]))) {
                     for(let i = Math.min(input[0], input[2]) + 1; i < Math.max(input[0], input[2]); i++) 
                         if(this.#board.game[i][input[1]] !== Shogi.Space) return"指定的棋子(香車)在移動起點與移動目標中有其他棋子。";
@@ -472,22 +483,85 @@ class Shogi {
                 return "指定的棋子(香車)無法做出這樣的移動。";
             }
             if(koma === Shogi.Rook){
-                //TODO: 飛車的移動檢查
+                //棋子前後連續空盤判定
+                if(input[1] === input[3]) {
+                    for(let i = Math.min(input[0], input[2]) + 1; i < Math.max(input[0], input[2]); i++) 
+                        if(this.#board.game[i][input[1]] !== Shogi.Space) return"指定的棋子(飛車)在移動起點與移動目標中有其他棋子。";
+                    return true;
+                }
+                //棋子左右連續空盤判定
+                if(input[0] === input[2]) {
+                    for(let i = Math.min(input[1], input[3]) + 1; i < Math.max(input[1], input[3]); i++) 
+                        if(this.#board.game[input[0]][i] !== Shogi.Space) return"指定的棋子(飛車)在移動起點與移動目標中有其他棋子。";
+                    return true;
+                }
                 return "指定的棋子(飛車)無法做出這樣的移動。";
             }
             if(koma === Shogi.Bishop){
-                //TODO: 角行的移動檢查
+                //棋子正向斜連續空盤判定
+                if((input[1] - input[3]) === (input[0] - input[2])) {
+                    for(let i = Math.min(input[0], input[2]) + 1, j = Math.min(input[1], input[3]) + 1;
+                         i < Math.max(input[0], input[2]); 
+                         i++, j++) 
+                        if(this.#board.game[i][j] !== Shogi.Space) return"指定的棋子(角行)在移動起點與移動目標中有其他棋子。";
+                    return true;
+                }
+                //棋子逆向斜連續空盤判定
+                if((input[3] - input[1]) === (input[0] - input[2])) {
+                    for(let i = Math.min(input[0], input[2]) + 1, j = Math.max(input[1], input[3]) - 1;
+                         i < Math.max(input[0], input[2]); 
+                         i++, j--) 
+                        if(this.#board.game[i][j] !== Shogi.Space) return"指定的棋子(角行)在移動起點與移動目標中有其他棋子。";
+                    return true;
+                }
                 return "指定的棋子(角行)無法做出這樣的移動。";
             }
             if(koma === Shogi.RookPlus){
-                //TODO: 角行的移動檢查
+                //棋子前後連續空盤判定
+                if(input[1] === input[3]) {
+                    for(let i = Math.min(input[0], input[2]) + 1; i < Math.max(input[0], input[2]); i++) 
+                        if(this.#board.game[i][input[1]] !== Shogi.Space) return"指定的棋子(龍王)在移動起點與移動目標中有其他棋子。";
+                    return true;
+                }
+                //棋子左右連續空盤判定
+                if(input[0] === input[2]) {
+                    for(let i = Math.min(input[1], input[3]) + 1; i < Math.max(input[1], input[3]); i++) 
+                        if(this.#board.game[input[0]][i] !== Shogi.Space) return"指定的棋子(龍王)在移動起點與移動目標中有其他棋子。";
+                    return true;
+                }
+                //左上左下右上右下共四格
+                if((input[1] - input[3]  === 1 || input[1] - input[3] === -1))
+                    if((input[0] - input[2]  === 1 || input[0] - input[2] === -1))
+                        return true;
                 return "指定的棋子(龍王)無法做出這樣的移動。";
             }
             if(koma === Shogi.BishopPlus){
-                //TODO: 龍馬的移動檢查
+                //棋子正向斜連續空盤判定
+                if((input[1] - input[3]) === (input[0] - input[2])) {
+                    for(let i = Math.min(input[0], input[2]) + 1, j = Math.min(input[1], input[3]) + 1;
+                         i < Math.max(input[0], input[2]); 
+                         i++, j++) 
+                        if(this.#board.game[i][j] !== Shogi.Space) return"指定的棋子(龍馬)在移動起點與移動目標中有其他棋子。";
+                    return true;
+                }
+                //棋子逆向斜連續空盤判定
+                if((input[3] - input[1]) === (input[0] - input[2])) {
+                    for(let i = Math.min(input[0], input[2]) + 1, j = Math.max(input[1], input[3]) - 1;
+                         i < Math.max(input[0], input[2]); 
+                         i++, j--) {
+                            console.log(`${i}, ${j}`)
+                            if(this.#board.game[i][j] !== Shogi.Space) return"指定的棋子(龍馬)在移動起點與移動目標中有其他棋子。";
+                         }
+                    return true;
+                }
+                //八方八格
+                if((input[1] - input[3]  <= 1 && input[1] - input[3] >= -1))
+                    if((input[0] - input[2]  <= 1 && input[0] - input[2] >= -1))
+                        return true;
                 return "指定的棋子(龍馬)無法做出這樣的移動。";
             }
             if(koma === Shogi.King){
+                //八方八格
                 if((input[1] - input[3]  <= 1 && input[1] - input[3] >= -1))
                     if((input[0] - input[2]  <= 1 && input[0] - input[2] >= -1))
                         return true;
