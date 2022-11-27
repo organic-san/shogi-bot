@@ -410,7 +410,25 @@ class Shogi {
     checkLegitimacy(content, isSente) {
         //關於邊界範圍內的問題已經在輸入型態檢查那裏處理，不需要再額外判斷
         if(Number.isNaN(parseInt(content[0]))) {
-            //TODO: 旗子放置
+            const koma = content[0].toLowerCase();
+            const temochi = (isSente ? this.#board.senteKoma : this.#board.goteKoma);
+            if(!temochi.includes(koma)) return "手上並沒有這枚棋子。";
+            const input = [parseInt(content[3]) - 1, 9 - parseInt(content[2])];
+            const to = this.#board.game[input[2]][input[3]];
+            if(to !== Shogi.Space) return "放置棋子的位置已經有其他棋子。";
+            if((koma === Shogi.Pawn || koma === Shogi.Lance) && (isSente ? (input[0] < 1) : (input[0] >= 8)))
+                return "放置在此位置會使棋子無法移動。";
+            if((koma === Shogi.Knight) && (isSente ? (input[0] < 2) : (input[0] >= 7)))
+                return "放置在此位置會使棋子無法移動。";
+            if(koma === Shogi.Pawn)
+                for(let i = 0; i < 9; i++){
+                    if(isSente ? 
+                        (this.#board.game[i][input[1]] === Shogi.Pawn.toUpperCase()) : 
+                        (this.#board.game[i][input[1]] === Shogi.Pawn.toLowerCase())) {
+                            return "無法在同一排裡面放上兩個以上的步兵。";
+                    }
+                }
+            return true;
         } else {
             //旗子移動
             const input = [parseInt(content[1]) - 1, 9 - parseInt(content[0]), parseInt(content[3]) - 1, 9 - parseInt(content[2])];
@@ -568,7 +586,6 @@ class Shogi {
                 return "指定的棋子(玉將)無法做出這樣的移動。";
             }
         }
-        //TODO: 較驗殊入是否符合規則
     }
 
     /**
@@ -580,7 +597,7 @@ class Shogi {
         if(Number.isNaN(parseInt(content[0]))) {
             if(content.length < 3 && content.length > 4) return false;
             if(content.length === 3) {
-                if(KomaNameLegitimate.get(content[0])) return false;
+                if(!KomaNameLegitimate.get(content[0])) return false;
                 if(parseInt(content[1]) < 1 || parseInt(content[1]) > 9) return false;
                 if(!kanjiToNumber.get(content[2])) return false;
                 return true;
