@@ -148,7 +148,7 @@ module.exports = {
             msg.edit({
                 content:
                     `${gameInfo}\n${nowPlayer}${ind == sente ? msgPlaying : msgWaiting}`,
-                files: [await board.board(ind == sente)],
+                files: [await board.board(ind == sente, ind == sente)],
                 components: []
             })
         })
@@ -180,6 +180,41 @@ module.exports = {
                 if(reason !== true) return msg.reply({content: '輸入錯誤：' + reason + '\n請重新輸入。', allowedMentions: {repliedUser: false}});
                 board.putKoma(input, playerIsSente);
 
+                //TODO: 遊戲終止設定
+                if(false) {
+                    
+                } else {
+                    collector[(player + 1) % 2].resetTimer(timelimit * 60 * 1000);
+                    collector[player].resetTimer(999 * 60 * 1000);
+                    step++;
+                    player = (player + 1) % 2;
+                    const senteBoard = await board.board(true, player === sente);
+                    const goteBoard = await board.board(false, player === gote);
+
+                    nowPlayer = 
+                        `目前操作玩家: ${user[player]} (${user[player].tag})\n`;
+                    //masu = msg.content.slice(0, 1).toUpperCase() + msg.content.slice(1);
+                    let kmsg = message[index];
+                    message[index] = await user[index].send({
+                        content:
+                            `${gameInfo}\n${nowPlayer}${msgWaiting}`,
+                        files: [index == sente ? senteBoard : goteBoard],
+                        components: []
+                    });
+                    message[(index + 1) % 2].edit({
+                        content:
+                            `${gameInfo}\n${nowPlayer}${msgPlaying}`,
+                        files: [(index + 1) % 2 == sente ? senteBoard : goteBoard],
+                        components: []
+                    });
+                    await kmsg.delete();
+                    mainMsg.edit({
+                        content: `${gameInfo}\n${nowPlayer}"遊戲正在進行中..."`,
+                        files: [senteBoard],
+                        components: []
+                    }).catch(() => {});
+                }
+
                 //TODO: 對執行結果做遊戲結束的檢定
                 //TODO: 更新遊玩過程資料並傳送給玩家與主訊息，主訊息的圖片以先手方顯示的版本為主
             });
@@ -189,8 +224,8 @@ module.exports = {
             col.on('end',async (c, r) => {
                 if(r !== "messageDelete" && r !== "end"){
                     //TODO: 修改勝負判定讓超時的一方為敗者，另一方為勝者
-                    const senteBoard = await board.board(true);
-                    const goteBoard = await board.board(false);
+                    const senteBoard = await board.board(true, 2);
+                    const goteBoard = await board.board(false, 2);
                     message[index].edit({
                         content: 
                             `${gameInfo}\n\n` + 
@@ -346,8 +381,9 @@ class Shogi {
     /**
      * 
      * @param {boolean} isSente 設為true時代表回傳先手視角，否則回傳後手視角
+     * @param {boolean} isPlayer 下棋方是否為下方玩家
      */
-    async board(isSente) {
+    async board(isSente, isPlayer) {
         const canvas = Canvas.createCanvas(2304, 2304);
 		const context = canvas.getContext('2d');
 
@@ -403,9 +439,11 @@ class Shogi {
             context.drawImage(gote, 43, 1981, 500, 281);
         }
 
-        const playerMark = await Canvas.loadImage(`./pic/shogi-player.png`);
-        if(isSente) context.drawImage(playerMark, 26, 1648, 300, 300);
-        else context.drawImage(playerMark, 1978, 356, 300, 300);
+        if(isPlayer !== 2) {
+            const playerMark = await Canvas.loadImage(`./pic/shogi-player.png`);
+            if(isPlayer) context.drawImage(playerMark, 26, 1648, 300, 300);
+            else context.drawImage(playerMark, 1978, 356, 300, 300);
+        }
 
         const rowMax = 18;
 
@@ -478,11 +516,11 @@ class Shogi {
             const fromIsSente = (from === from.toUpperCase()) && (from !== Shogi.Space);
             const koma = from.toLowerCase();
             const to = this.#board.game[input[2]][input[3]];
-            const toIsSente = (to === to.toUpperCase())  && (to !== Shogi.Space);
+            const toIsSente = (to === to.toUpperCase());
             if(from === Shogi.Space) return "移動起點不存在旗子。";
             if(isSente !== fromIsSente) return "移動起點的棋子是敵方棋子。";
             if((input[1] === input[3]) && (input[0] === input[2])) return "移動起點與移動目標相同。";
-            if(isSente === toIsSente) return "移動目標中有我方棋子。";
+            if((isSente === toIsSente) && (to !== Shogi.Space)) return "移動目標中有我方棋子。";
             if(shouhen && !(isSente ? ((input[2] < 3) || input[0] < 3) : (input[2] >= 6) || input[0] >= 6)) 
                 return "該移動目標沒辦法讓指定的棋子升變。";
             if(shouhen && 
@@ -634,7 +672,37 @@ class Shogi {
      * @param {boolean} isSente 是否先手，將影響判斷是哪一方的旗子。
      */
     putKoma(content, isSente) {
-        //TODO: 放置棋子
+        if(Number.isNaN(parseInt(content[0]))) {
+            const input = [parseInt(content[3]) - 1, 9 - parseInt(content[2])];
+            if(isSente) {
+                this.#board.senteKoma.splice(this.#board.senteKoma.findIndex(val => val === content[0].toLowerCase()), 1);
+                this.#board.game[input[0]][input[1]] = content[0].toUpperCase();
+            } else {
+                this.#board.goteKoma.splice(this.#board.goteKoma.findIndex(val => val === content[0].toLowerCase()), 1);
+                this.#board.game[input[0]][input[1]] = content[0].toLowerCase();
+            }
+        } else {
+            const input = [parseInt(content[1]) - 1, 9 - parseInt(content[0]), parseInt(content[3]) - 1, 9 - parseInt(content[2])];
+            if(this.#board.game[input[2]][input[3]] !== Shogi.Space) {
+                let t = "";
+                if(this.#board.game[input[2]][input[3]].length === 2) t = this.#board.game[input[2]][input[3]][1];
+                else t = this.#board.game[input[2]][input[3]][0];
+                t = t.toLowerCase();
+                if(isSente) {
+                    this.#board.senteKoma.push(t);
+                    this.#board.senteKoma = Shogi.komaSort(this.#board.senteKoma);
+                } else {
+                    this.#board.goteKoma.push(t);
+                    this.#board.goteKoma = Shogi.komaSort(this.#board.goteKoma);
+                }
+            }
+            if(content.length === 5) {
+                this.#board.game[input[2]][input[3]] = "+" + this.#board.game[input[0]][input[1]];
+            } else {
+                this.#board.game[input[2]][input[3]] = this.#board.game[input[0]][input[1]];
+            }
+            this.#board.game[input[0]][input[1]] = Shogi.Space;
+        }
     }
 
     /**
@@ -703,8 +771,12 @@ class Shogi {
         return returnVal.join('');
     }
 
-    static komaSort() {
-        //TODO: 將棋排序: 手持駒的顯示順序
+    /**
+     * 
+     * @param {Array<string>} arr 
+     */
+    static komaSort(arr) {
+        return arr.sort((a, b) => (KomaToSortNumber.get(a) - KomaToSortNumber.get(b)));
     }
 }
 
@@ -728,4 +800,14 @@ const KomaNameLegitimate = new Map([
     ['金', 'G'], ['金將', 'G'],
     ['角', 'B'], ['角行', 'B'],
     ['飛', 'R'], ['飛車', 'R'],
+]);
+
+const KomaToSortNumber = new Map([
+    ['p', '7'], 
+    ['l', '6'],
+    ['n', '5'],
+    ['s', '4'],
+    ['g', '3'],
+    ['b', '2'],
+    ['r', '1'],
 ]);
