@@ -177,11 +177,33 @@ module.exports = {
                 const input = Shogi.inputTranslate(msg.content, playerIsSente);
                 const reason = board.checkLegitimacy(input, playerIsSente);
                 if(reason !== true) return msg.reply({content: '輸入錯誤：' + reason + '\n請重新輸入。', allowedMentions: {repliedUser: false}});
-                board.putKoma(input, playerIsSente);
+                const biteKoma = board.putKoma(input, playerIsSente);
 
-                if(false) {
-                    
-                    //TODO: 對執行結果做遊戲結束的檢定
+                //TODO: 對執行結果做遊戲正式結束的檢定(現有的是簡易版)
+                if(biteKoma === Shogi.King) {
+                    const senteBoard = await board.board(true, player === sente);
+                    const goteBoard = await board.board(false, player === gote);
+                    user.forEach((u, k) => {
+                        u.send({
+                            content: 
+                            `${gameInfo}\n` + 
+                            `恭喜由 ${user[index]} (${user[index].tag}) 獲勝!`,
+                            files: [k == sente ? senteBoard : goteBoard],
+                            components: []
+                        })
+                        //TODO: 感想戰
+                        //TODO: 資料儲存(boardRecord資料夾)
+                        //TODO: 資料提取方法
+                    })
+                    await message[0].delete();
+                    await message[1].delete();
+                    mainMsg.edit({
+                        content: `${gameInfo}\n恭喜由 ${user[index]} (${user[index].tag}) 獲勝!`,
+                        files: [senteBoard],
+                        components: []
+                    }).catch(() => {});
+                    collector[0].stop('end');
+                    collector[1].stop('end');
                 } else {
                     collector[(player + 1) % 2].resetTimer(timelimit * 60 * 1000);
                     collector[player].resetTimer(999 * 60 * 1000);
@@ -695,17 +717,28 @@ class Shogi {
         } else {
             const input = [parseInt(content[1]) - 1, 9 - parseInt(content[0]), parseInt(content[3]) - 1, 9 - parseInt(content[2])];
             if(this.#board.game[input[2]][input[3]] !== Shogi.Space) {
+                
+                //暫時性結局測試A
+                const k = this.#board.game[input[2]][input[3]].toLowerCase();
+                //A結束，下接B
+                //TODO: 詰判定
+
                 let t = "";
                 if(this.#board.game[input[2]][input[3]].length === 2) t = this.#board.game[input[2]][input[3]][1];
                 else t = this.#board.game[input[2]][input[3]][0];
                 t = t.toLowerCase();
                 if(isSente) {
                     this.#board.senteKoma.push(t);
-                    this.komaSortSente();
+                    this.#komaSortSente();
                 } else {
                     this.#board.goteKoma.push(t);
-                    this.komaSortGote();
+                    this.#komaSortGote();
                 }
+
+                //暫時性結局測試B
+                if(k === Shogi.King) return Shogi.King;
+                //測試結束
+                //TODO: 詰判定
             }
             if(content.length === 5) {
                 this.#board.game[input[2]][input[3]] = "+" + this.#board.game[input[0]][input[1]];
@@ -714,6 +747,7 @@ class Shogi {
             }
             this.#board.game[input[0]][input[1]] = Shogi.Space;
         }
+        //TODO: 回傳這一步下了什麼棋
     }
 
     /**
@@ -782,11 +816,11 @@ class Shogi {
         return returnVal.join('');
     }
 
-    komaSortSente() {
+    #komaSortSente() {
          this.#board.senteKoma.sort((a, b) => (KomaToSortNumber.get(a) - KomaToSortNumber.get(b)));
     }
 
-    komaSortGote() {
+    #komaSortGote() {
         this.#board.goteKoma.sort((a, b) => (KomaToSortNumber.get(a) - KomaToSortNumber.get(b)));
    }
 }
