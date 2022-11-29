@@ -1,5 +1,5 @@
 /.env
-/userdata
+/data
 node_modules/
 /data/record.json
 /commands/test.js

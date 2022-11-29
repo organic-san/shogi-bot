@@ -1,6 +1,8 @@
 const Discord = require('discord.js');
 const Canvas = require('@napi-rs/canvas');
-const simbol = ["☗", "☖"];
+const GameData = require('../class/gameData');
+const fs = require('fs');
+const symbol = ["☗", "☖"];
 
 module.exports = {
 	data: new Discord.SlashCommandBuilder()
@@ -131,11 +133,12 @@ module.exports = {
         let player = sente;
         let step = 0;
         const board = new Shogi();
+        const gameData = new GameData.GameData(user[sente].id, user[gote].id, mainMsg.createdTimestamp / 1000);
         board.init();
         const gameInfo = 
             `遊戲: 將棋\n` + 
-            `先手${simbol[sente]}: ${user[sente]} (${user[sente].tag})\n` + 
-            `後手${simbol[gote]}: ${user[gote]} (${user[gote].tag})\n`;
+            `先手${symbol[sente]}: ${user[sente]} (${user[sente].tag})\n` + 
+            `後手${symbol[gote]}: ${user[gote]} (${user[gote].tag})\n`;
         let nowPlayer = 
             `目前操作玩家: ${user[sente]} (${user[sente].tag})\n`;
         const msgPlaying = "請輸入要下棋的位置。\n\n" + inputRule;
@@ -178,7 +181,8 @@ module.exports = {
                 const reason = board.checkLegitimacy(input, playerIsSente);
                 if(reason !== true) return msg.reply({content: '輸入錯誤：' + reason + '\n請重新輸入。', allowedMentions: {repliedUser: false}});
                 const biteKoma = board.putKoma(input, playerIsSente);
-
+                gameData.addStep(input);
+                step++;
                 //TODO: 對執行結果做遊戲正式結束的檢定(現有的是簡易版)
                 if(biteKoma === Shogi.King) {
                     const senteBoard = await board.board(true, player === sente);
@@ -187,7 +191,7 @@ module.exports = {
                         u.send({
                             content: 
                             `${gameInfo}\n` + 
-                            `恭喜由 ${user[index]} (${user[index].tag}) 獲勝!`,
+                            `恭喜由 ${user[index]} (${user[index].tag}) 獲勝!\n總步數：${step} 步`,
                             files: [k == sente ? senteBoard : goteBoard],
                             components: []
                         })
@@ -198,16 +202,24 @@ module.exports = {
                     await message[0].delete();
                     await message[1].delete();
                     mainMsg.edit({
-                        content: `${gameInfo}\n恭喜由 ${user[index]} (${user[index].tag}) 獲勝!`,
+                        content: `${gameInfo}\n恭喜由 ${user[index]} (${user[index].tag}) 獲勝!\n總步數：${step} 步`,
                         files: [senteBoard],
                         components: []
                     }).catch(() => {});
+
+                    //儲存戰績
+                    fs.writeFile(
+                        `./data/gameData/${mainMsg.id}.json`, 
+                        JSON.stringify(gameData, null, '\t'),async function (err) {
+                            if (err) return console.log(err);
+                        }
+                    );
+
                     collector[0].stop('end');
                     collector[1].stop('end');
                 } else {
                     collector[(player + 1) % 2].resetTimer(timelimit * 60 * 1000);
                     collector[player].resetTimer(999 * 60 * 1000);
-                    step++;
                     player = (player + 1) % 2;
                     const senteBoard = await board.board(true, player === sente);
                     const goteBoard = await board.board(false, player === gote);
