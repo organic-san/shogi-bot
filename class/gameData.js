@@ -56,7 +56,7 @@ class GameData {
     toJSON() {
         return {
             "playerSente": this.playerSente,
-            "playeGote": this.playerGote,
+            "playerGote": this.playerGote,
             "startState": this.#startState,
             "gameRecord": this.#gameRecord,
             "time": this.time,
@@ -72,10 +72,11 @@ class GameData {
     }
 
     runOneStep(steps) {
+        //TODO: 旗子分辨、"同"分辨、不成分辨，詳情看棋譜說明
         const content = this.#gameRecord[steps];
         let word = "";
         if(Number.isNaN(parseInt(content[0]))) {
-            word += (content[2] + GameData.#numToKanji(content[3]) + GameData.#engToKoma[content[0].toUpperCase()] + "打");
+            word += (content[2] + GameData.#numToKanji(content[3]) + GameData.#engToKoma(content[0].toUpperCase()) + "打");
         } else {
             const input = [parseInt(content[1]) - 1, 9 - parseInt(content[0]), parseInt(content[3]) - 1, 9 - parseInt(content[2])];
             word += (content[2] + GameData.#numToKanji(content[3]) + GameData.#engToKoma(this.#startState[input[0]][input[1]].toUpperCase()));

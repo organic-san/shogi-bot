@@ -133,7 +133,7 @@ module.exports = {
         let player = sente;
         let step = 0;
         const board = new Shogi();
-        const gameData = new GameData.GameData(user[sente].id, user[gote].id, mainMsg.createdTimestamp / 1000);
+        const gameData = new GameData.GameData(user[sente].id, user[gote].id, Math.floor(mainMsg.createdTimestamp / 1000).toString());
         board.init();
         const gameInfo = 
             `遊戲: 將棋\n` + 
@@ -187,22 +187,24 @@ module.exports = {
                 if(biteKoma === Shogi.King) {
                     const senteBoard = await board.board(true, player === sente);
                     const goteBoard = await board.board(false, player === gote);
+                    const recordway = 
+                        "這場對戰的 game-id 是" +mainMsg.id + "。\n" +
+                        "可以在伺服器中使用 `/record` 指令查詢這場對戰的過程。";
                     user.forEach((u, k) => {
                         u.send({
                             content: 
                             `${gameInfo}\n` + 
-                            `恭喜由 ${user[index]} (${user[index].tag}) 獲勝!\n總步數：${step} 步`,
+                            `恭喜由 ${user[index]} (${user[index].tag}) 獲勝!\n總手數：${step} 手\n${recordway}`,
                             files: [k == sente ? senteBoard : goteBoard],
                             components: []
                         })
                         //TODO: 感想戰
-                        //TODO: 資料儲存(boardRecord資料夾)
-                        //TODO: 資料提取方法
+                        //TODO: 對用戶勝敗資料儲存
                     })
                     await message[0].delete();
                     await message[1].delete();
                     mainMsg.edit({
-                        content: `${gameInfo}\n恭喜由 ${user[index]} (${user[index].tag}) 獲勝!\n總步數：${step} 步`,
+                        content: `${gameInfo}\n恭喜由 ${user[index]} (${user[index].tag}) 獲勝!\n總手數：${step} 手\n${recordway}`,
                         files: [senteBoard],
                         components: []
                     }).catch(() => {});

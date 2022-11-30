@@ -36,6 +36,7 @@ module.exports = {
         let returnData = 
             `對戰ID ${gameID} 的資料：\n` + 
             `對戰開始時間：<t:${gameData.time}:f>\n` +
+            `總手數：${gameData.steps} 手\n` +
             `${symbol[0]}先手：<@${gameData.playerSente}> (${sente.tag})\n` +
             `${symbol[1]}後手：<@${gameData.playerGote}> (${gote.tag})\n\n`;
         await interaction.editReply(returnData);
@@ -44,7 +45,7 @@ module.exports = {
         for(let i = 0; i < gameData.steps; i++) {
             let a = "";
             a += symbol[i % 2] + gameData.runOneStep(i);
-            a = a.padEnd(5, "　");
+            a = a.padEnd(6, "　");
             a += (i % 2 === 0 ? "" : "\n");
             playing += a;
             if(i % 100 === 0 && i !== 0) {
