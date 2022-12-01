@@ -1,5 +1,5 @@
 const Discord = require('discord.js');
-const Canvas = require('@napi-rs/canvas');
+const Canvas = require('canvas');
 const GameData = require('../class/gameData');
 const fs = require('fs');
 const symbol = ["☗", "☖"];
@@ -517,7 +517,7 @@ class Shogi {
                 baseKomaPos.y - (imageSize / 2) + komaHei * (Math.floor(i / rowMax)), 
                 imageSize, imageSize);
         }
-        const attachment = new Discord.AttachmentBuilder(await canvas.encode('png'), { name: 'profile-image.png' });
+        const attachment = new Discord.AttachmentBuilder(canvas.toBuffer(), { name: 'profile-image.png' });
         return attachment;
         /*
         if(!facing) {
